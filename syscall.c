@@ -6,7 +6,18 @@
 #include "proc.h"
 #include "x86.h"
 #include "syscall.h"
+#include "date.h"
 
+// 比较字符串，没有就自己实现
+int
+strcmp(const char *s1, const char *s2)
+{
+  while (*s1 && *s2 && *s1 == *s2) {
+    s1++;
+    s2++;
+  }
+  return (unsigned char)*s1 - (unsigned char)*s2;
+}
 // User code makes a system call with INT T_SYSCALL.
 // System call number in %eax.
 // Arguments on the stack, from the user call to the C
@@ -103,6 +114,7 @@ extern int sys_unlink(void);
 extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
+extern int sys_date(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -126,17 +138,58 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_date]    sys_date,
+};
+static char* syscall_names[] = {
+    [SYS_fork]    "fork",
+    [SYS_exit]    "exit",
+    [SYS_wait]    "wait",
+    [SYS_pipe]    "pipe",
+    [SYS_read]    "read",
+    [SYS_kill]    "kill",
+    [SYS_exec]    "exec",
+    [SYS_fstat]   "fstat",
+    [SYS_chdir]   "chdir",
+    [SYS_dup]     "dup",
+    [SYS_getpid]  "getpid",
+    [SYS_sbrk]    "sbrk",
+    [SYS_sleep]   "sleep",
+    [SYS_uptime]  "uptime",
+    [SYS_open]    "open",
+    [SYS_write]   "write",
+    [SYS_mknod]   "mknod",
+    [SYS_unlink]  "unlink",
+    [SYS_link]    "link",
+    [SYS_mkdir]   "mkdir",
+    [SYS_close]   "close",
 };
 
-void
-syscall(void)
+int
+sys_date(void)
 {
+  struct rtcdate *r;
+  // 从用户空间获取指针参数
+  if (argptr(0, (void*)&r, sizeof(*r)) < 0) {
+    return -1;
+  }
+  // 调用cmostime()读取硬件时间
+  cmostime(r);
+  return 0;
+}
+
+void
+syscall(void) {
   int num;
   struct proc *curproc = myproc();
 
   num = curproc->tf->eax;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    curproc->tf->eax = syscalls[num]();
+    curproc->tf->eax = syscalls[num]();	
+
+    // 仅跟踪 init 进程的系统调用 这时会输出命令和返回值
+    if (strcmp(curproc->name, "init") == 0) {
+      cprintf("%s -> %d\n", syscall_names[num], curproc->tf->eax);
+    }
   } else {
     cprintf("%d %s: unknown sys call %d\n",
             curproc->pid, curproc->name, num);
