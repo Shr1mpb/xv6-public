@@ -38,3 +38,4 @@ void* malloc(uint);
 void free(void*);
 int atoi(const char*);
 int date(struct rtcdate*);
+int alarm(int ticks, void (*handler)());

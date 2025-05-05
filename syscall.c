@@ -115,6 +115,7 @@ extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
 extern int sys_date(void);
+extern int sys_alarm(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -139,6 +140,7 @@ static int (*syscalls[])(void) = {
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
 [SYS_date]    sys_date,
+[SYS_alarm]   sys_alarm,
 };
 static char* syscall_names[] = {
     [SYS_fork]    "fork",
@@ -162,20 +164,9 @@ static char* syscall_names[] = {
     [SYS_link]    "link",
     [SYS_mkdir]   "mkdir",
     [SYS_close]   "close",
+	[SYS_alarm]	  "alarm",
 };
 
-int
-sys_date(void)
-{
-  struct rtcdate *r;
-  // 从用户空间获取指针参数
-  if (argptr(0, (void*)&r, sizeof(*r)) < 0) {
-    return -1;
-  }
-  // 调用cmostime()读取硬件时间
-  cmostime(r);
-  return 0;
-}
 
 void
 syscall(void) {

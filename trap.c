@@ -54,6 +54,18 @@ trap(struct trapframe *tf)
       wakeup(&ticks);
       release(&tickslock);
     }
+    if(myproc() && (tf->cs & 3) == 3){ // 用户态进程
+        myproc()->curticks++;
+        if(myproc()->alarmticks == myproc()->curticks){  // 到达了周期
+            myproc()->curticks = 0;
+
+          // 下面两句将eip压栈
+          tf->esp -= 4;    
+          *((uint *)(tf->esp)) = tf->eip;
+          // 将alarmhandler复制给eip，准备执行
+          tf->eip =(uint) myproc()->alarmhandler;
+        }
+      }
     lapiceoi();
     break;
   case T_IRQ0 + IRQ_IDE:

@@ -89,3 +89,31 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+int
+sys_date(void)
+{
+  struct rtcdate *r;
+  // 从用户空间获取指针参数
+  if (argptr(0, (void*)&r, sizeof(*r)) < 0) {
+    return -1;
+  }
+  // 调用cmostime()读取硬件时间
+  cmostime(r);
+  return 0;
+}
+
+//sysproc.c
+int
+sys_alarm(void){
+      int ticks;
+      void (*handler)();
+ 
+      if(argint(0, &ticks) < 0)
+        return -1;
+      if(argptr(1, (char**)&handler, 1) < 0)
+        return -1;
+      myproc()->alarmticks = ticks;
+      myproc()->alarmhandler = handler;
+      return 0;
+}
