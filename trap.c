@@ -13,7 +13,8 @@ struct gatedesc idt[256];
 extern uint vectors[];  // in vectors.S: array of 256 entry pointers
 struct spinlock tickslock;
 uint ticks;
-
+// 添加 mappages 声明
+extern int mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm);
 void
 tvinit(void)
 {
@@ -47,6 +48,38 @@ trap(struct trapframe *tf)
   }
 
   switch(tf->trapno){
+	case T_PGFLT:
+    // 获取导致页错误的虚拟地址
+    char *mem;
+    uint a = PGROUNDDOWN(rcr2());
+    
+    // 检查地址是否在进程大小范围内
+    if(a >= myproc()->sz){
+      cprintf("pid %d %s: trap %d err %d on cpu %d "
+              "eip 0x%x addr 0x%x--kill proc\n",
+              myproc()->pid, myproc()->name, tf->trapno,
+              tf->err, cpuid(), tf->eip, rcr2());
+      myproc()->killed = 1;
+      break;
+    }
+    
+    // 分配物理内存
+    mem = kalloc();
+    if(mem == 0){
+      cprintf("lazy alloc: out of memory\n");
+      myproc()->killed = 1;
+      break;
+    }
+    memset(mem, 0, PGSIZE);
+    
+    // 映射到页表
+    if(mappages(myproc()->pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U) < 0){
+      cprintf("lazy alloc: out of memory (mappages failed)\n");
+      kfree(mem);
+      myproc()->killed = 1;
+      break;
+    }
+    break;
   case T_IRQ0 + IRQ_TIMER:
     if(cpuid() == 0){
       acquire(&tickslock);
