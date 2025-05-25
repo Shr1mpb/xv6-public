@@ -374,6 +374,7 @@ bmap(struct inode *ip, uint bn)
 {
   uint addr, *a;
   struct buf *bp;
+  struct buf *bp2;
 
   if(bn < NDIRECT){
     if((addr = ip->addrs[bn]) == 0)
@@ -393,6 +394,40 @@ bmap(struct inode *ip, uint bn)
       log_write(bp);
     }
     brelse(bp);
+    return addr;
+  }
+  bn -= NINDIRECT;
+
+  // 新增的二级间接块处理
+  if(bn < NINDIRECT * NINDIRECT){
+    uint indirect_idx = bn / NINDIRECT;
+    uint block_idx = bn % NINDIRECT;
+    
+    // 分配二级间接块
+    if((addr = ip->addrs[NDIRECT+1]) == 0)
+      ip->addrs[NDIRECT+1] = addr = balloc(ip->dev);
+    
+    // 读取二级间接块
+    bp = bread(ip->dev, addr);
+    a = (uint*)bp->data;
+    
+    // 分配一级间接块
+    if((addr = a[indirect_idx]) == 0){
+      a[indirect_idx] = addr = balloc(ip->dev);
+      log_write(bp);
+    }
+    brelse(bp);
+    
+    // 读取一级间接块
+    bp2 = bread(ip->dev, addr);
+    a = (uint*)bp2->data;
+    
+    // 分配数据块
+    if((addr = a[block_idx]) == 0){
+      a[block_idx] = addr = balloc(ip->dev);
+      log_write(bp2);
+    }
+    brelse(bp2);
     return addr;
   }
 
